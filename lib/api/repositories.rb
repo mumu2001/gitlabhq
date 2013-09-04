@@ -184,6 +184,50 @@ module API
         content_type blob.mime_type
         present blob.data
       end
+
+      # Get a list of commit notes
+      #
+      # Parameters:
+      #   id (required) - The ID of a project
+      #   sha (required) - The commit or branch name
+      # Example Request:
+      #   GET /projects/:id/repository/:sha/notes
+      get ":id/repository/commits/:sha/notes" do
+        authorize! :download_code, user_project
+        sha = params[:sha]
+        commit = user_project.repository.commit(sha)
+        not_found! "Commit" unless commit
+        notes = Note.find_all_by_commit_id(commit.id)
+        present notes, with: Entities::Note
+      end
+
+      # Create a new commit note
+      #
+      # Parameters:
+      #   id (required) - The ID of a project
+      #   sha (required) - The commit or branch name
+      #   body (required) - The content of a note
+      # Example Request:
+      #   POST /projects/:id/repository/:sha/notes
+      post ":id/repository/commits/:sha/notes" do
+        required_attributes! [:body]
+
+        sha = params[:sha]
+        commit = user_project.repository.commit(sha)
+        not_found! "Commit" unless commit
+        note = Note.new(note: params[:body])
+        note.author = current_user
+        note.project = user_project
+        note.noteable_type = "Commit"
+        note.commit_id = commit.id
+
+        if note.save
+          present note, with: Entities::Note
+        else
+          not_found!
+        end
+      end
+
     end
   end
 end
